@@ -61,15 +61,29 @@ speaker_en_pin_bcm = 20
 calibration_path = "/etc/nomopractic/calibration.toml"
 
 # ─── Audio levels (ALSA mixer control) ──────────────────────────────────────
-# Controls output volume (HifiBerry DAC) and mic capture gain (PCM2902 USB mic)
-# via `amixer`.  Card indices and control names can be confirmed with
-# `aplay -l` / `arecord -l` / `amixer -c <idx> scontrols`.
+# Controls output volume and mic capture gain via `amixer`.  Cards are
+# resolved by NAME against /proc/asound/cards (ALSA card numbers depend on
+# driver load order, so hardcoded indices go stale); set an explicit
+# *_card_index only to force a specific card.  Confirm names and controls
+# with `cat /proc/asound/cards` and `amixer -c <idx> scontrols`.
 
 [audio]
-# output_card_index = 1           # ALSA card index for HifiBerry DAC output
-output_control    = "Master"      # ALSA sset control name for output volume
-input_card_index  = 2             # ALSA card index for USB mic (PCM2902)
-input_control     = "Mic"         # ALSA sset control name for capture gain
+# The robot's mic is the USB PCM2902 codec. USB codecs expose the capture
+# (ADC) level as "Mic" and/or "Capture"; each configured control that exists
+# on the card is driven, absent ones skipped. Confirm the real names with
+# `amixer -c <idx> scontrols`.
+input_card_name  = "USB"
+input_controls   = ["Mic", "Capture"]
+# input_card_index =              # explicit override (rarely needed)
+
+# The Robot HAT speaker is an I2S DAC that only exists once
+# `dtoverlay=hifiberry-dac` is enabled in /boot/firmware/config.txt.  The DAC
+# has no hardware mixer, so volume additionally needs an ALSA softvol control
+# whose name matches output_control.  Until both are set up, set_volume fails
+# (the error lists the controls actually available on the card).
+output_card_name = "sndrpihifiberry"
+output_control   = "Master"
+# output_card_index =             # explicit override (rarely needed)
 
 # ─── Routine Engine ──────────────────────────────────────────────────────────
 # Configuration for autonomous on-robot routines (Phase 11).

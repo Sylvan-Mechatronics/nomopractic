@@ -79,31 +79,49 @@ impl Default for SensorChannels {
     }
 }
 
-/// ALSA mixer configuration for audio output (HifiBerry DAC) and input
+/// ALSA mixer configuration for audio output (speaker) and input
 /// (USB microphone PCM2902).
 ///
-/// Card indices and control names are system-specific; defaults match the
-/// PicarX Robot HAT V4 setup where HifiBerry is card 1 and the USB mic is
-/// card 2.
+/// Cards are resolved by *name* against `/proc/asound/cards` (an explicit
+/// numeric index overrides): ALSA card numbers depend on driver load order,
+/// and a stale hardcoded index silently targets the wrong card — the robot
+/// has only the playback-only HDMI card (0) and the USB codec (1), and the
+/// Robot HAT speaker's I2S DAC only exists once `dtoverlay=hifiberry-dac`
+/// is enabled in the Pi boot config.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct AudioConfig {
-    /// ALSA card index for the HifiBerry DAC output (default: None).
+    /// Explicit ALSA card index for speaker output; None = resolve by name.
     pub output_card_index: Option<u8>,
-    /// ALSA mixer control name for output volume (default: "Master").
+    /// Case-insensitive substring matched against `/proc/asound/cards` to
+    /// find the output card (default: "sndrpihifiberry", the Robot HAT I2S
+    /// DAC card id).  No match falls back to the ALSA default card.
+    pub output_card_name: String,
+    /// ALSA mixer control name for output volume (default: "Master"; the
+    /// I2S DAC has no hardware mixer, so this must match the softvol
+    /// control configured in asound.conf).
     pub output_control: String,
-    /// ALSA card index for the USB microphone input (default: Some(2)).
+    /// Explicit ALSA card index for the microphone; None = resolve by name.
     pub input_card_index: Option<u8>,
-    /// ALSA mixer control name for microphone capture gain (default: "Mic").
-    pub input_control: String,
+    /// Case-insensitive substring matched against `/proc/asound/cards` to
+    /// find the input card (default: "USB", the PCM2902 codec).
+    pub input_card_name: String,
+    /// ALSA mixer capture controls driven for microphone gain, in priority
+    /// order (default: ["Mic", "Capture"]). Each control that exists on the
+    /// card is set; absent ones are skipped. USB codecs differ in whether the
+    /// ADC level is named "Mic" or "Capture", so both are driven by default.
+    pub input_controls: Vec<String>,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
         Self {
             output_card_index: None,
+            output_card_name: "sndrpihifiberry".into(),
             output_control: "Master".into(),
-            input_card_index: Some(2),
-            input_control: "Mic".into(),
+            input_card_index: None,
+            input_card_name: "USB".into(),
+            input_controls: vec!["Mic".into(), "Capture".into()],
         }
     }
 }
