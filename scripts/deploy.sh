@@ -513,7 +513,7 @@ if [[ "\${_svc_user}" != "root" ]]; then
     _sudoers_tmp="\$(mktemp)"
     printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl start nomothetic-ap.service, /usr/bin/systemctl stop nomothetic-ap.service\n' \
         "\${_svc_user}" > "\${_sudoers_tmp}"
-    if visudo -c -f "\${_sudoers_tmp}" >/dev/null 2>&1; then
+    if /usr/sbin/visudo -c -f "\${_sudoers_tmp}" >/dev/null 2>&1; then
         sudo install -m 440 -o root -g root "\${_sudoers_tmp}" /etc/sudoers.d/nomon-ap-service
         echo "==> Sudoers rule for nomothetic-ap.service installed ✓"
     else
@@ -526,14 +526,16 @@ fi
 if [[ -f "${REMOTE_TMPFILES}" ]]; then
     echo "==> Installing tmpfiles.d/nomon.conf..."
     sudo mkdir -p /etc/tmpfiles.d
-    sudo mv -f "${REMOTE_TMPFILES}" /etc/tmpfiles.d/nomon.conf
+    envsubst '\$NOMON_SERVICE_USER \$NOMON_SERVICE_GROUP' < "${REMOTE_TMPFILES}" | sudo tee /etc/tmpfiles.d/nomon.conf > /dev/null
     sudo chmod 644 /etc/tmpfiles.d/nomon.conf
+    rm -f "${REMOTE_TMPFILES}"
     sudo systemd-tmpfiles --create /etc/tmpfiles.d/nomon.conf || true
 fi
 
-# Ensure /var/lib/nomon is owned by nomon so that the nomothetic service can
-# write the pairing secret and JWT signing secret to this directory.
-sudo chown -R "nomon:\${NOMON_SERVICE_GROUP:-nomon}" /var/lib/nomon || true
+# Ensure /var/lib/nomon is owned by the configured service user/group so that
+# the nomothetic service can write the pairing secret and JWT signing secret
+# to this directory.
+sudo chown -R "\${NOMON_SERVICE_USER}:\${NOMON_SERVICE_GROUP:-nomon}" /var/lib/nomon || true
 
 # If a config was uploaded, atomically install it to /etc/nomopractic
 if [[ -n "\${REMOTE_CONFIG_TMP}" ]]; then
@@ -699,13 +701,15 @@ else
     # directory exists with correct owner/permissions on boot.
     echo "==> Installing tmpfiles.d/nomon.conf..."
     sudo mkdir -p /etc/tmpfiles.d
-    sudo cp "${REPO_DIR}/systemd/tmpfiles.d/nomon.conf" /etc/tmpfiles.d/nomon.conf
+    envsubst '$NOMON_SERVICE_USER $NOMON_SERVICE_GROUP' < "${REPO_DIR}/systemd/tmpfiles.d/nomon.conf" \
+        | sudo tee /etc/tmpfiles.d/nomon.conf > /dev/null
     sudo chmod 644 /etc/tmpfiles.d/nomon.conf
     sudo systemd-tmpfiles --create /etc/tmpfiles.d/nomon.conf || true
 
-    # Ensure /var/lib/nomon is owned by nomon so that the nomothetic service
-    # can write the pairing secret and JWT signing secret to this directory.
-    sudo chown -R "nomon:${NOMON_SERVICE_GROUP:-nomon}" /var/lib/nomon || true
+    # Ensure /var/lib/nomon is owned by the configured service user/group so
+    # that the nomothetic service can write the pairing secret and JWT
+    # signing secret to this directory.
+    sudo chown -R "${NOMON_SERVICE_USER}:${NOMON_SERVICE_GROUP:-nomon}" /var/lib/nomon || true
 
     sudo systemctl daemon-reload
     sudo systemctl enable  "${SERVICE}"
