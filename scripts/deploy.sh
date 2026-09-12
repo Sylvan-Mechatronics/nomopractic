@@ -15,7 +15,7 @@
 # Environment:
 #   NOMON_PI_HOST       SSH target (overridden by pi-host arg)
 #   NOMON_SSH_KEY       Path to SSH private key (optional)
-#   NOMON_GITHUB_REPO   GitHub "owner/repo" slug. Default: Perceptua-Nomon/nomopractic
+#   NOMON_GITHUB_REPO   GitHub "owner/repo" slug. Default: Sylvan-Mechatronics/nomopractic
 #
 # Examples:
 #   # Deploy local code from a dev machine to a Pi over SSH:
@@ -61,7 +61,7 @@ REPO_DIR="$(dirname "${SCRIPT_DIR}")"
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-REPO="${NOMON_GITHUB_REPO:-Perceptua-Nomon/nomopractic}"
+REPO="${NOMON_GITHUB_REPO:-Sylvan-Mechatronics/nomopractic}"
 INSTALL_PATH="/usr/local/bin/nomopractic"
 AP_MODE_INSTALL_PATH="/usr/local/bin/ap-mode.sh"
 SERVICE="nomopractic"
