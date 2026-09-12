@@ -95,9 +95,11 @@ impl Handler {
     pub fn new(config: Arc<Config>, hat: Arc<Hat>, gpio: Arc<HatGpio>) -> Self {
         let alsa: Arc<dyn AlsaControl> = Arc::new(AmixerControl {
             output_card_index: config.audio.output_card_index,
+            output_card_name: config.audio.output_card_name.clone(),
             output_control: config.audio.output_control.clone(),
             input_card_index: config.audio.input_card_index,
-            input_control: config.audio.input_control.clone(),
+            input_card_name: config.audio.input_card_name.clone(),
+            input_controls: config.audio.input_controls.clone(),
         });
         Self::with_alsa(config, hat, gpio, alsa)
     }
