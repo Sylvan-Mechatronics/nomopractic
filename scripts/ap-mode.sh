@@ -81,6 +81,11 @@ _connection_active() {
 
 cmd_up() {
     if _connection_active; then
+        # Keep the stored PSK current even while up; it takes effect on the
+        # next activation (a live change would drop connected clients).
+        local current
+        current=$(_get_passphrase)
+        nmcli connection modify "${CON_NAME}" wifi-sec.psk "${current}" 2>/dev/null || true
         echo "already up"
         # Ensure the AP service is running even if the AP was already active.
         sudo systemctl start nomothetic-ap.service 2>/dev/null || true
@@ -100,7 +105,10 @@ cmd_up() {
     passphrase=$(_get_passphrase)
 
     if _connection_exists; then
-        # Connection profile exists but is not active — just activate it.
+        # Connection profile exists but is not active. Re-apply the passphrase
+        # first: profiles created by older builds carry the 8-digit pairing
+        # code as their PSK, and the passphrase may have been rotated since.
+        nmcli connection modify "${CON_NAME}" wifi-sec.psk "${passphrase}"
         nmcli connection up "${CON_NAME}"
     else
         # Create a new hotspot connection profile.
