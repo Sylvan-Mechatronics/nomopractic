@@ -365,6 +365,7 @@ coordinated IPC call. Channel-to-peripheral mappings are defined in
 | 13.1 | BLE Simplification | ⊘ Superseded by Phase 15 | — |
 | 14 | Service Env-File & Deploy Hardening | ✅ Complete | — |
 | 15 | BLE → Wi-Fi Soft AP Migration | ✅ Complete | — |
+| 16 | Odometry, IMU & UWB Raw Inputs; `cmd_vel` | 🔜 Planned — autonomon ADR-008 | — |
 
 **Test total (current): 239 passing** (201 lib + 38 integration; BLE tests from Phase 13 removed in Phase 15)
 
@@ -1307,3 +1308,58 @@ antenna contention.
 - [x] `docs/architecture.md`: updated to document end-to-end provisioning flow
 
 **Cross-repo:** nomothetic Phase 20.4
+
+---
+
+## Phase 16 — Odometry, IMU & UWB Raw Inputs; `cmd_vel` (P0 for autonomy)
+
+> Set by autonomon ADR-008 (2026-09-13). The brain needs a pose and a fast
+> operator range before it can follow safely or retrace a route. These are
+> pure **raw inputs** (ADR-004 boundary): nomopractic reads the hardware and
+> exposes counts/rates; all fusion happens in autonomon.
+
+### 16.1 — Wheel odometry
+- [ ] `[odometry]` config: per-motor encoder (or hall) GPIO pins, ticks per
+      revolution, wheel diameter, track width
+- [ ] `hat/encoder.rs` — interrupt-driven tick counters behind a `GpioBus`
+      trait (mock in tests)
+- [ ] IPC `read_odometry` → `{ left_ticks, right_ticks, left_m, right_m,
+      dt_ms, timestamp }`; counters are monotonic, reset on daemon start
+- Verify: 1 m push test reports `left_m`/`right_m` within 2 %
+
+### 16.2 — IMU
+- [ ] `[imu]` config: I2C address, model (BNO055 / ICM-20948 / MPU-6050
+      class), mounting orientation
+- [ ] `hat/imu.rs` — driver behind the `I2cBus` trait; 20 Hz sampling task
+- [ ] IPC `read_imu` → `{ gyro_radps: [x,y,z], accel_mps2: [x,y,z],
+      heading_deg?: f64, timestamp }`
+- Verify: stationary gyro bias < 0.01 rad/s after warm-up; 90° table turn
+      integrates to 90 ± 3°
+
+### 16.3 — UWB ranging
+- [ ] `[uwb]` config: serial device, baud, module protocol (DW3000-class
+      module reporting range / PDoA bearing)
+- [ ] `hat/uwb.rs` — UART line parser; `read_uwb` → `{ range_cm,
+      bearing_deg?: f64, quality, timestamp }`
+- Verify: 1 m and 3 m tape-measure checks within 15 cm
+
+### 16.4 — `cmd_vel` and chassis kinematics
+- [ ] IPC `cmd_vel { v_mps, omega_radps, ttl_ms }` — converts body velocity
+      to PicarX Ackermann steer angle + motor speed using the calibration
+      store; same lease/watchdog semantics as `drive`/`steer`
+- [ ] `[kinematics]` config: wheelbase, max steer angle, speed→duty map
+- Verify: `cmd_vel {0.3, 0}` drives straight at ≈0.3 m/s over 2 m; a
+      commanded arc closes within 10 % radius
+
+### 16.5 — Reduce the Phase-11 routine engine to reflexes
+- [ ] Remove the `explore` wandering behaviour from `src/routine/`; keep
+      `stop_if_closer_than_cm` and `stop_on_cliff` as reflex guards that
+      override any lease (the brain owns behaviour — autonomon ADR-004/008)
+- [ ] `start_routine` accepts only the reflex set; nomothetic Phase 11 docs
+      updated
+
+#### Phase 16 Exit Criteria
+- [ ] `cargo test` green with mocked encoder/IMU/UWB buses; `make check` clean
+- [ ] `docs/hat_ipc_schema.md` (nomothetic) documents `read_odometry`,
+      `read_imu`, `read_uwb`, `cmd_vel`
+- [ ] Bench verification steps above recorded in `docs/hardware_reference.md`
