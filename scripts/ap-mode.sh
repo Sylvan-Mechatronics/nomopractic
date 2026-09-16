@@ -83,9 +83,15 @@ cmd_up() {
     if _connection_active; then
         # Keep the stored PSK current even while up; it takes effect on the
         # next activation (a live change would drop connected clients).
+        # Best-effort only: the AP is already serving clients, so a missing or
+        # unreadable passphrase file must not turn this into a hard failure —
+        # it would also skip the service start below.
         local current
-        current=$(_get_passphrase)
-        nmcli connection modify "${CON_NAME}" wifi-sec.psk "${current}" 2>/dev/null || true
+        if current=$(_get_passphrase 2>/dev/null); then
+            nmcli connection modify "${CON_NAME}" wifi-sec.psk "${current}" 2>/dev/null || true
+        else
+            echo "WARNING: could not read the AP passphrase; leaving the stored PSK unchanged" >&2
+        fi
         echo "already up"
         # Ensure the AP service is running even if the AP was already active.
         sudo systemctl start nomothetic-ap.service 2>/dev/null || true
