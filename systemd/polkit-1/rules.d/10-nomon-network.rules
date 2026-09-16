@@ -5,14 +5,39 @@
 // Polkit ordinarily requires an "active" local session even for root when
 // issuing NM actions such as connection-up, connection-add, and wifi-share.
 // These services have no TTY or logind session, so we grant the relevant
-// actions to root explicitly.
+// actions explicitly.
 //
-// Users in the 'netdev' group are also granted access so that the nomothetic
-// API service user (non-root) can invoke ap-mode.sh for POST /api/device/wifi/ap.
-// The deploy script adds the service user to 'netdev' automatically.
+// Users in the 'netdev' group (the nomothetic API service user) get only the
+// actions the Soft AP and Wi-Fi provisioning flows need — not every
+// org.freedesktop.NetworkManager.* action (review finding S-16):
+//   network-control          nmcli device wifi connect / device disconnect
+//   settings.modify.system   nmcli connection add (persisted profiles)
+//   settings.modify.own      same, for per-user profiles
+//   wifi.share.protected     hotspot with a WPA2 PSK (ipv4.method shared)
+//   wifi.share.open          hotspot with no PSK (not used, listed for parity)
+//   enable-disable-wifi      radio toggling during AP up/down
+//
+// NOTE: there is no bare "org.freedesktop.NetworkManager.wifi.share" action —
+// NetworkManager only defines the .protected and .open variants. Listing the
+// bare id grants nothing, which silently breaks Soft AP activation for the
+// non-root service user that runs ap-mode.sh.
 polkit.addRule(function(action, subject) {
-    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 &&
-            (subject.user === "root" || subject.isInGroup("netdev"))) {
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") !== 0) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.user === "root") {
         return polkit.Result.YES;
     }
+    var allowed = [
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.NetworkManager.settings.modify.own",
+        "org.freedesktop.NetworkManager.wifi.share.protected",
+        "org.freedesktop.NetworkManager.wifi.share.open",
+        "org.freedesktop.NetworkManager.enable-disable-wifi"
+    ];
+    if (subject.isInGroup("netdev") && allowed.indexOf(action.id) !== -1) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
 });

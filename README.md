@@ -102,21 +102,24 @@ src/
 When the device cannot reach a known Wi-Fi network, the Soft AP watchdog
 (`systemd/nomon-softap-watchdog.timer`) calls `scripts/ap-mode.sh up` to
 broadcast a WPA2 hotspot named `nomon-<last4-of-MAC>`. The passphrase is read
-from `/var/lib/nomon/pairing_secret` — the same shared secret that nomothetic
-generates on first boot.
+from `/var/lib/nomon/ap_passphrase` — a long random secret that nomothetic
+generates on first boot, separate from the 8-digit pairing code (an 8-digit
+WPA2 PSK would be crackable offline from a captured handshake).
 
 The hotspot is accessible from any browser or the nomotactic app:
 
 ```
 SSID:       nomon-<last4-of-MAC>
-Passphrase: contents of /var/lib/nomon/pairing_secret
+Passphrase: contents of /var/lib/nomon/ap_passphrase
+            (also shown at /run/nomothetic/ap-passphrase on the Pi)
 Device IP:  192.168.4.1
 API:        http://192.168.4.1:8080
 ```
 
 Once connected, open `http://192.168.4.1:8080` and follow the on-screen
-pairing prompt — enter the same passphrase shown in the nomothetic startup
-log to obtain a device-scoped JWT.
+pairing prompt to obtain a device-scoped JWT. Being on the AP network is the
+proof of possession; the 8-digit pairing code is only needed when pairing over
+the home network instead.
 
 The watchdog automatically deactivates the AP once the Pi acquires a full
 internet connection, restoring normal operation.
