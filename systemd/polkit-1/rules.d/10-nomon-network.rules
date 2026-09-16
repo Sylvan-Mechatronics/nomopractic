@@ -13,8 +13,14 @@
 //   network-control          nmcli device wifi connect / device disconnect
 //   settings.modify.system   nmcli connection add (persisted profiles)
 //   settings.modify.own      same, for per-user profiles
-//   wifi.share               hotspot (ipv4.method shared)
+//   wifi.share.protected     hotspot with a WPA2 PSK (ipv4.method shared)
+//   wifi.share.open          hotspot with no PSK (not used, listed for parity)
 //   enable-disable-wifi      radio toggling during AP up/down
+//
+// NOTE: there is no bare "org.freedesktop.NetworkManager.wifi.share" action —
+// NetworkManager only defines the .protected and .open variants. Listing the
+// bare id grants nothing, which silently breaks Soft AP activation for the
+// non-root service user that runs ap-mode.sh.
 polkit.addRule(function(action, subject) {
     if (action.id.indexOf("org.freedesktop.NetworkManager.") !== 0) {
         return polkit.Result.NOT_HANDLED;
@@ -26,7 +32,8 @@ polkit.addRule(function(action, subject) {
         "org.freedesktop.NetworkManager.network-control",
         "org.freedesktop.NetworkManager.settings.modify.system",
         "org.freedesktop.NetworkManager.settings.modify.own",
-        "org.freedesktop.NetworkManager.wifi.share",
+        "org.freedesktop.NetworkManager.wifi.share.protected",
+        "org.freedesktop.NetworkManager.wifi.share.open",
         "org.freedesktop.NetworkManager.enable-disable-wifi"
     ];
     if (subject.isInGroup("netdev") && allowed.indexOf(action.id) !== -1) {
